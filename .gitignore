@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.DS_Store
+/releases/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+workspace.json
+workspace.previous.json
+nas.json
+auth.json
+Backups/
+Deleted Drafts/
+*.p12
+*.pfx
+*.mobileprovision
+*.log
+.envrc
+.codex/
+.claude/
+.gemini/

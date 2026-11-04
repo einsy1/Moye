@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {renderMarkdown} from '../web/markdown.js';
+assert.match(renderMarkdown('###标题'),/<h3>标题<\/h3>/);
+assert.match(renderMarkdown('plain\n###标题'),/<h3>标题<\/h3>/);
+assert.match(renderMarkdown('>引用'),/<blockquote>/);
+assert.match(renderMarkdown('>引用\n正文'),/<\/blockquote>\n<p>正文/);
+assert.match(renderMarkdown('> ```\n> ==code==\n> ```'),/<code>==code==/);
+assert.match(renderMarkdown('==高亮 **粗体**=='),/<mark>高亮 <strong>粗体<\/strong><\/mark>/);
+assert.match(renderMarkdown('`==literal==`'),/<code>==literal==<\/code>/);
+assert.match(renderMarkdown('``a ` ==literal==``'),/<code>a ` ==literal==<\/code>/);
+assert.match(renderMarkdown('`one\n==literal==`'),/<code>one ==literal==<\/code>/);
+assert.match(renderMarkdown('```\na\n~~~\n###inside code\n```'),/###inside code/);
+assert.doesNotMatch(renderMarkdown('```\na\n~~~\n###inside code\n```'),/<h3>/);
+assert.doesNotMatch(renderMarkdown('````\n```\n###inside\n````'),/<h3>/);
+assert.doesNotMatch(renderMarkdown('    ###not heading\n    ==code=='),/<h3>|<mark>/);
+assert.match(renderMarkdown('[link](https://example.com/==literal==)'),/href="https:\/\/example.com\/==literal=="/);
+assert.match(renderMarkdown('one\ntwo'),/one<br>two/);
+console.log('PASS: Markdown extensions preserve inline, fenced and indented code, links, headings and GFM line breaks');

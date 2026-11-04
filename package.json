@@ -1,0 +1,39 @@
+{
+  "name": "moye",
+  "private": true,
+  "version": "2.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node tests/smoke.mjs",
+    "test:native": "node tests/native.mjs",
+    "test:bridge": "node tests/bridge.mjs",
+    "test:markdown": "node tests/markdown.mjs",
+    "test:regressions": "node tests/regressions.mjs",
+    "release": "node scripts/release.mjs",
+    "test:ai": "swiftc -parse-as-library Sources/CodexAssistant.swift tests/CodexLiveTests.swift -o dist/codex-live-tests && dist/codex-live-tests",
+    "test:assistant": "node tests/assistant.mjs",
+    "screenshots": "node scripts/screenshots.mjs",
+    "test:titlebar": "swiftc -parse-as-library Sources/TitlebarDragView.swift tests/TitlebarTests.swift -framework Cocoa -o dist/titlebar-tests && dist/titlebar-tests"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-markdown": "^6",
+    "@codemirror/language": "^6",
+    "@codemirror/search": "^6",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "@lezer/highlight": "^1",
+    "dompurify": "^3",
+    "lucide": "^0.468.0",
+    "marked": "^15"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25",
+    "playwright": "^1.56"
+  }
+}
