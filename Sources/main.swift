@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             alert.informativeText = "为保护草稿，请退出其他版本后再启动此版本。"
             alert.addButton(withTitle: "退出"); alert.runModal(); NSApp.terminate(nil); return
         }
-        do { try store.backupBeforeUpgrade(version: "2.0.1") }
+        do { try store.backupBeforeUpgrade(version: "2.0.2") }
         catch {
             let alert = NSAlert(); alert.messageText = "升级前备份失败"
             alert.informativeText = "为保留回滚数据，墨页尚未修改草稿。请检查磁盘空间和权限后重试。\n" + error.localizedDescription
@@ -165,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         item.target = self; item.representedObject = command; menu.addItem(item)
     }
     @objc func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "墨页 Moye", .applicationVersion: "2.0.1", .credits: NSAttributedString(string: "一处安静的 Markdown 书写空间。\n基于 CodeMirror 6、Marked 与 DOMPurify。")])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "墨页 Moye", .applicationVersion: "2.0.2", .credits: NSAttributedString(string: "一处安静的 Markdown 书写空间。\n基于 CodeMirror 6、Marked 与 DOMPurify。")])
     }
     @objc func menuCommand(_ sender: NSMenuItem) {
         if let command = sender.representedObject as? String {
@@ -232,6 +232,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         case "nasOpenFile": openNASFile(data)
         case "nasTest", "nasSave": configureNAS(data, save: action == "nasSave")
         case "nasUpload": upload(data)
+        case "openRecent":
+            if let path = data["path"] as? String { openLocalURL(URL(fileURLWithPath:path)) }
         case "open":
             let panel = NSOpenPanel(); panel.allowedContentTypes = [.plainText, UTType(filenameExtension: "md") ?? .plainText]; panel.allowsMultipleSelection = false
             panel.beginSheetModal(for: window) { response in

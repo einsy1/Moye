@@ -21,3 +21,4 @@ jobs:
       - run: npm run test:assistant
       - run: npm run test:native
       - run: npm run test:titlebar
+      - run: npm run test:startup

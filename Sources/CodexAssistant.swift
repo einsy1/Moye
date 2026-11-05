@@ -50,7 +50,7 @@ final class CodexAssistant {
         do {
             try p.run(); process = p; input = stdin.fileHandleForWriting; output = ""
             timer = Timer.scheduledTimer(withTimeInterval: 180, repeats: false) { [weak self] _ in self?.finish("error", "请求超时，正文未改变。请重试或缩小选区。") }
-            send(["id":1,"method":"initialize","params":["clientInfo":["name":"moye","title":"Moye","version":"2.0.1"]]])
+            send(["id":1,"method":"initialize","params":["clientInfo":["name":"moye","title":"Moye","version":"2.0.2"]]])
         } catch { finish("error", "无法启动 Codex：" + error.localizedDescription) }
     }
     private func consume(_ data: Data) {

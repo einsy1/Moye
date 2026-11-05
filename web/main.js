@@ -22,6 +22,14 @@ let docs=[],activeId,mode='split',currentSection='documents',saveTimer,toastTime
 const editorStates=new Map(),scrollPositions=new Map();
 try{Object.assign(prefs,JSON.parse(localStorage.getItem('moye.v11.prefs') || localStorage.getItem('moye.prefs')||'{}'));docs=JSON.parse(localStorage.getItem('moye.v11.docs') || localStorage.getItem('moye.docs')||'[]');if(!Array.isArray(docs))docs=[];docs=docs.filter(d=>typeof d.id==='string'&&typeof d.text==='string'&&typeof d.name==='string');activeId=localStorage.getItem('moye.v11.active') || localStorage.getItem('moye.active');}catch{}
 if (Array.isArray(bootstrap.snapshot?.docs)) { docs=bootstrap.snapshot.docs;activeId=bootstrap.snapshot.activeId;Object.assign(prefs,bootstrap.snapshot.prefs||{}); }
+let recentFiles=Array.isArray(bootstrap.snapshot?.recentFiles)?bootstrap.snapshot.recentFiles:[];
+if(!native){try{recentFiles=JSON.parse(localStorage.getItem('moye.recentFiles')||'[]')}catch{}}
+recentFiles=(Array.isArray(recentFiles)?recentFiles:[]).filter(f=>f&&typeof f.path==='string'&&typeof f.name==='string').slice(0,30);
+for(const doc of docs)if(doc.path&&!recentFiles.some(f=>f.path===doc.path))recentFiles.push({path:doc.path,name:doc.name,openedAt:doc.updated||0});
+// Start every launch on an empty draft; retain all earlier writing. Reuse an untouched blank.
+let startupDraft=docs.find(d=>d.text===''&&!d.path&&!d.nasRemote&&!d.pendingUpload);
+if(!startupDraft){startupDraft={id:crypto.randomUUID(),name:'未命名文稿',text:'',updated:Date.now()};docs.unshift(startupDraft)}
+activeId=startupDraft.id;
 if(!docs.length)docs=[{id:crypto.randomUUID(),name:'未命名文稿',text:'',updated:Date.now()}];
 if(!docs.some(d=>d.id===activeId))activeId=docs[0].id;
 const current=()=>docs.find(d=>d.id===activeId);
@@ -111,11 +119,27 @@ const markdownPairs=EditorView.inputHandler.of((v,from,to,text)=>{
 function editorState(text){return EditorState.create({doc:text,extensions:[history(),drawSelection(),highlightActiveLine(),closeBrackets(),markdownPairs,Prec.highest(keymap.of([{key:'Mod-b',run:()=>{wrap('**');return true}},{key:'Mod-i',run:()=>{wrap('*');return true}},{key:'Mod-k',run:()=>{insertLink();return true}},{key:'Enter',run:v=>{const s=v.state.selection.main;if(!s.empty)return false;const line=v.state.doc.lineAt(s.from);if(/^\s*>+\s*$/.test(line.text)){v.dispatch({changes:{from:line.from,to:line.to,insert:''},selection:{anchor:line.from}});return true}return false}},{key:'Backspace',run:v=>{const s=v.state.selection.main;if(!s.empty||s.from===0)return false;const b=v.state.doc.sliceString(s.from-1,s.from),a=v.state.doc.sliceString(s.from,s.from+1);if(b===a&&['*','~','`','='].includes(b)){v.dispatch({changes:{from:s.from-1,to:s.from+1}});return true}return false}}])),markdown({base:markdownLanguage,codeLanguages}),syntaxHighlighting(highlight),markdownDecorations,bracketMatching(),search({top:true}),EditorView.lineWrapping,lineConfig.of(prefs.lines?lineNumbers():[]),spellConfig.of(EditorView.contentAttributes.of({spellcheck:String(prefs.spell),'aria-label':'Markdown 编辑器'})),keymap.of([...closeBracketsKeymap,...defaultKeymap,...historyKeymap,...searchKeymap,indentWithTab]),EditorView.updateListener.of(update=>{if(update.docChanged){current().text=update.state.doc.toString();current().updated=Date.now();$('#save-state').textContent='正在保存草稿…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,350);clearTimeout(renderTimer);renderTimer=setTimeout(()=>{renderPreview();renderOutline();updateStats()},100)}if(update.selectionSet||update.docChanged)updateCursor()})]})}
 const view=new EditorView({state:editorState(current().text),parent:$('#editor')});
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),2400)}
-window.exportSnapshot=()=>({version:2,docs,activeId,prefs});
+window.exportSnapshot=()=>({version:2,docs,activeId,prefs,recentFiles});
 function refreshSaveState(){const doc=current();let state=doc.pendingUpload?'NAS 待上传 · 本机已备份':doc.path?(doc.text===doc.savedText?'文件已保存':'文件有修改 · 草稿已备份'):doc.nasRemote?(doc.text===doc.nasSavedText?'NAS 已上传':'NAS 有修改 · 草稿已备份'):'草稿已备份';$('#save-state').textContent=state;$('#status').textContent=state;$('#pending-count').textContent=docs.filter(d=>d.pendingUpload).length;}
-function persist(){if(native){bridge('persist',{snapshot:window.exportSnapshot()});}else{try{localStorage.setItem('moye.v11.docs',JSON.stringify(docs));localStorage.setItem('moye.v11.active',activeId);refreshSaveState()}catch{$('#save-state').textContent='草稿保存失败';$('#status').textContent='请使用 ⌘S 保存文件';toast('草稿保存失败，请保存到本地文件')}}renderDocuments()}
+function persist(){if(native){bridge('persist',{snapshot:window.exportSnapshot()});}else{try{localStorage.setItem('moye.v11.docs',JSON.stringify(docs));localStorage.setItem('moye.v11.active',activeId);localStorage.setItem('moye.recentFiles',JSON.stringify(recentFiles));refreshSaveState()}catch{$('#save-state').textContent='草稿保存失败';$('#status').textContent='请使用 ⌘S 保存文件';toast('草稿保存失败，请保存到本地文件')}}renderDocuments()}
 
-function renderDocuments(){const list=$('#doc-list');list.replaceChildren();for(const doc of docs){let b=document.createElement('button');b.className='doc'+(doc.id===activeId?' active':'');b.innerHTML='<i data-lucide="file-text"></i><div><strong></strong><small></small></div>';b.querySelector('strong').textContent=doc.name;b.querySelector('small').textContent=doc.pendingUpload?'NAS 待上传':doc.nasRemote?'NAS 文稿':doc.path?'本地文件 · '+new Date(doc.updated).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}):'本地草稿';b.onclick=()=>switchDoc(doc.id);list.append(b)}$('#doc-count').textContent=docs.length;iconify()}
+function renderDocuments(){const list=$('#doc-list');list.replaceChildren();for(const doc of docs){let b=document.createElement('button');b.className='doc'+(doc.id===activeId?' active':'');b.innerHTML='<i data-lucide="file-text"></i><div><strong></strong><small></small></div>';b.querySelector('strong').textContent=doc.name;b.querySelector('small').textContent=doc.pendingUpload?'NAS 待上传':doc.nasRemote?'NAS 文稿':doc.path?'本地文件 · '+new Date(doc.updated).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}):'本地草稿';b.onclick=()=>switchDoc(doc.id);list.append(b)}$('#doc-count').textContent=docs.length;renderRecentFiles();iconify()}
+function rememberFile(path,name){
+  if(!path)return;
+  recentFiles=[{path,name,openedAt:Date.now()},...recentFiles.filter(f=>f.path!==path)].slice(0,30);
+}
+function renderRecentFiles(){
+  const list=$('#recent-list');list.replaceChildren();
+  $('#recent-empty').hidden=recentFiles.length>0;
+  for(const file of [...recentFiles].sort((a,b)=>(b.openedAt||0)-(a.openedAt||0))){
+    const button=document.createElement('button');button.className='doc recent-file';button.title=file.path;
+    button.innerHTML='<i data-lucide="history"></i><div><strong></strong><small></small></div>';
+    button.querySelector('strong').textContent=file.name;
+    button.querySelector('small').textContent='本地文件 · '+new Date(file.openedAt||0).toLocaleDateString('zh-CN',{month:'short',day:'numeric'});
+    button.onclick=()=>{if(native)bridge('openRecent',{path:file.path});else{const doc=docs.find(d=>d.path===file.path);if(doc)switchDoc(doc.id);else toast('请在 macOS 应用中重新打开文件')}};
+    list.append(button);
+  }
+}
 function switchDoc(id){
   if(id===activeId){renderAll();persist();return}
   persist();editorStates.set(activeId,view.state);scrollPositions.set(activeId,view.scrollDOM.scrollTop);
@@ -154,7 +178,15 @@ function setMode(next){mode=next;$('#workspace').className='workspace '+mode;$$(
 function bridge(action,data={}){if(window.webkit?.messageHandlers?.native){window.webkit.messageHandlers.native.postMessage({action,id:activeId,...data})}else if(action==='open'){let input=document.createElement('input');input.type='file';input.accept='.md,.markdown,.txt,.mdown';input.onchange=async()=>{const f=input.files[0];if(f&&f.size>10_000_000){toast('文稿超过 10 MB，请拆分后打开');return}if(f)window.receiveNative({action:'opened',name:f.name,text:await f.text()})};input.click()}else if(['save','saveAs','exportHTML'].includes(action)){let blob=new Blob([data.text],{type:action==='exportHTML'?'text/html':'text/markdown'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=data.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast('已导出文件')}else if(action==='print')window.print();else if(action==='link')window.open(data.url,'_blank','noopener')}
 function save(as=false){if(!as&&current().nasRemote&&!current().path){openNASUpload();return}persist();bridge(as?'saveAs':'save',{name:current().name.replace(/\.md$/i,'')+'.md',text:current().text,path:current().path||null,savedText:current().savedText})}
 function command(action){$('#menu').hidden=true;if(action==='minimal')toggleMinimal();else if(action==='nas')openNASUpload();else if(action==='nasOpen')openNASBrowserForRead();else if(action==='new')newDoc();else if(action==='open')bridge('open');else if(action==='save')save();else if(action==='saveAs')save(true);else if(action==='find')openSearchPanel(view);else if(action==='focus')toggleFocus();else if(action==='exportHTML'){const safe=DOMPurify.sanitize(renderMarkdown(current().text));bridge('exportHTML',{name:current().name+'.html',text:'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{max-width:760px;margin:60px auto;padding:24px;font:16px/1.8 system-ui}pre{padding:20px;background:#f5f5f7;overflow:auto}img{max-width:100%}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}blockquote{border-left:3px solid #ddd;padding-left:20px}</style>'+safe})}else if(action==='print')bridge('print');else if(action==='rename'){$('#rename-input').value=current().name;$('#rename-dialog').showModal();$('#rename-input').select()}else if(action==='delete'){if(!confirm('删除「'+current().name+'」的草稿？已保存的本机和 NAS 文件不受影响。'))return;if(native){bridge('deleteDraft',{doc:current()});return}removeDraft(activeId)}}
-function removeDraft(id){clearTimeout(saveTimer);editorStates.set(activeId,view.state);scrollPositions.set(activeId,view.scrollDOM.scrollTop);editorStates.delete(id);scrollPositions.delete(id);docs=docs.filter(d=>d.id!==id);if(!docs.length)docs=[{id:crypto.randomUUID(),name:'未命名文稿',text:'',updated:Date.now()}];if(!docs.some(d=>d.id===activeId))activeId=docs[0].id;const cached=editorStates.get(activeId);view.setState(cached&&cached.doc.toString()===current().text?cached:editorState(current().text));renderAll();persist()}
+function removeDraft(id){clearTimeout(saveTimer);editorStates.set(activeId,view.state);scrollPositions.set(activeId,view.scrollDOM.scrollTop);editorStates.delete(id);scrollPositions.delete(id);docs=docs.filter(d=>d.id!==id);let recentFiles=Array.isArray(bootstrap.snapshot?.recentFiles)?bootstrap.snapshot.recentFiles:[];
+if(!native){try{recentFiles=JSON.parse(localStorage.getItem('moye.recentFiles')||'[]')}catch{}}
+recentFiles=(Array.isArray(recentFiles)?recentFiles:[]).filter(f=>f&&typeof f.path==='string'&&typeof f.name==='string').slice(0,30);
+for(const doc of docs)if(doc.path&&!recentFiles.some(f=>f.path===doc.path))recentFiles.push({path:doc.path,name:doc.name,openedAt:doc.updated||0});
+// Start every launch on an empty draft; retain all earlier writing. Reuse an untouched blank.
+let startupDraft=docs.find(d=>d.text===''&&!d.path&&!d.nasRemote&&!d.pendingUpload);
+if(!startupDraft){startupDraft={id:crypto.randomUUID(),name:'未命名文稿',text:'',updated:Date.now()};docs.unshift(startupDraft)}
+activeId=startupDraft.id;
+if(!docs.length)docs=[{id:crypto.randomUUID(),name:'未命名文稿',text:'',updated:Date.now()}];if(!docs.some(d=>d.id===activeId))activeId=docs[0].id;const cached=editorStates.get(activeId);view.setState(cached&&cached.doc.toString()===current().text?cached:editorState(current().text));renderAll();persist()}
 window.nativeCommand=command;
 window.receiveNative=data=>{
 if(data.action==='aiResult'){receiveAI(data);return}
@@ -166,11 +198,11 @@ if(data.action==='nasOpened'){receiveNASFile(data);return}
 if(data.action==='nasConfigResult'){$('#nas-result').textContent=data.message;$('#nas-test').disabled=false;$('#nas-save').disabled=false;$('#nas-dot').textContent=data.ok?'最近测试成功':'连接失败';if(data.saved){nasConfig=data.config;$('#nas-password').value='';$('#nas-dot').textContent='最近测试成功';}return}
 if(data.action==='nasUploaded'){uploadInFlight=false;const doc=docs.find(d=>d.id===data.id);if(doc){doc.nasRemote={...data.remote,path:remotePath(data.remote)};doc.nasSavedText=data.savedText;delete doc.pendingUpload;persist()}toast('文稿已保存到 NAS');return}
 if(data.action==='nasFailed'){uploadInFlight=false;const doc=docs.find(d=>d.id===data.id);if(doc&&(data.pending||doc.pendingUpload)){doc.pendingUpload={...(data.pending||doc.pendingUpload),retryable:data.retryable,message:data.message};persist()}$('#nas-result').textContent=data.message;toast(data.message);return}
-if(data.action==='opened'){const existing=data.path&&docs.find(d=>d.path===data.path);if(existing){
+if(data.action==='opened'){rememberFile(data.path,data.name.replace(/\.(md|markdown|txt|mdown)$/i,''));const existing=data.path&&docs.find(d=>d.path===data.path);if(existing){
   if(existing.text===existing.savedText&&existing.text!==data.text){existing.text=data.text;existing.savedText=data.savedText??data.text;editorStates.delete(existing.id);if(existing.id===activeId)view.setState(editorState(existing.text))}
   else if(existing.savedText!==data.text){toast('磁盘文件已变化，已保留你的编辑；保存时会检查冲突。')}
   switchDoc(existing.id);return
-}let doc={id:crypto.randomUUID(),name:data.name.replace(/\.(md|markdown|txt|mdown)$/i,''),text:data.text,path:data.path,savedText:data.savedText??data.text,updated:Date.now()};docs.unshift(doc);switchDoc(doc.id)}else if(data.action==='saved'){const doc=docs.find(d=>d.id===data.id);if(doc){doc.path=data.path;doc.name=data.name.replace(/\.md$/i,'');doc.savedText=data.savedText;persist();$('#title').textContent=current().name}toast('已保存到本地文件')}else if(data.action==='error')toast(data.message)};
+}let doc={id:crypto.randomUUID(),name:data.name.replace(/\.(md|markdown|txt|mdown)$/i,''),text:data.text,path:data.path,savedText:data.savedText??data.text,updated:Date.now()};docs.unshift(doc);switchDoc(doc.id)}else if(data.action==='saved'){const doc=docs.find(d=>d.id===data.id);if(doc){rememberFile(data.path,data.name.replace(/\.md$/i,''));doc.path=data.path;doc.name=data.name.replace(/\.md$/i,'');doc.savedText=data.savedText;persist();$('#title').textContent=current().name}toast('已保存到本地文件')}else if(data.action==='error')toast(data.message)};
 function toggleMinimal(force){const next=force??!document.body.classList.contains('minimal');if(next){sessionMode=mode;setMode('edit');document.body.classList.remove('focus');}else if(sessionMode){setMode(sessionMode);sessionMode=null}document.body.classList.toggle('minimal',next);updateVisibility();prefs.minimal=next;$('#minimal-setting').checked=next;$('#minimal').setAttribute('aria-pressed',String(next));persist();setTimeout(()=>view.requestMeasure(),360);view.focus()}
 function toggleFocus(){document.body.classList.toggle('focus');updateVisibility();$('#focus').classList.toggle('active',document.body.classList.contains('focus'));view.requestMeasure()}
 $$('[data-section]').forEach((b,i)=>b.onclick=()=>{currentSection=b.dataset.section;$$('[data-section]').forEach(x=>x.classList.toggle('active',x===b));$('.nav-pill').style.transform=`translateY(${i*40}px)`;$$('.section').forEach(s=>s.classList.toggle('active',s.id===currentSection))});
@@ -323,3 +355,5 @@ $('#ai-apply').onclick=()=>{
  view.dispatch({changes:{from:job.from,to:job.to,insert:job.result},annotations:isolateHistory.of("full")});persist();
  bridge('aiUI',{applied:true});$('#ai-apply').disabled=true;aiJob=null;$('#ai-status').textContent='已应用；可用 ⌘Z 撤销，也可打开修改前草稿。';
 };
+
+requestAnimationFrame(()=>view.focus());

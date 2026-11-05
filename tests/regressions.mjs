@@ -19,7 +19,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForSelector('.cm-content');
   await page.evaluate(()=>window.receiveNative({action:'opened',name:'disk.md',path:'/tmp/moye-regression.md',text:'baseline',savedText:'baseline'}));
   await page.locator('.cm-content').click();await page.keyboard.press('End');await page.keyboard.type(' edited');
-  await page.locator('#new').click();await page.locator('.doc').filter({hasText:'disk'}).click();
+  await page.locator('#new').click();await page.locator('#doc-list .doc').filter({hasText:'disk'}).click();
   await page.locator('.cm-content').click();await page.keyboard.press('Meta+z');
   assert.equal(await page.locator('.cm-content').innerText(),'baseline','undo survives switching');
   await page.keyboard.press('Meta+Shift+z');assert.equal(await page.locator('.cm-content').innerText(),'baseline edited');

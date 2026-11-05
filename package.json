@@ -1,7 +1,7 @@
 {
   "name": "moye",
   "private": true,
-  "version": "2.0.1",
+  "version": "2.0.2",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -14,7 +14,8 @@
     "test:ai": "swiftc -parse-as-library Sources/CodexAssistant.swift tests/CodexLiveTests.swift -o dist/codex-live-tests && dist/codex-live-tests",
     "test:assistant": "node tests/assistant.mjs",
     "screenshots": "node scripts/screenshots.mjs",
-    "test:titlebar": "swiftc -parse-as-library Sources/TitlebarDragView.swift tests/TitlebarTests.swift -framework Cocoa -o dist/titlebar-tests && dist/titlebar-tests"
+    "test:titlebar": "swiftc -parse-as-library Sources/TitlebarDragView.swift tests/TitlebarTests.swift -framework Cocoa -o dist/titlebar-tests && dist/titlebar-tests",
+    "test:startup": "node tests/startup-history.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6",
